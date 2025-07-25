@@ -277,22 +277,22 @@ subdomain.example.org"></textarea>
       
       if (daysDiff < 0) {
         className = 'expiry-urgent';
-        message = `⚠️ EXPIRED ${Math.abs(daysDiff)} days ago!`;
+        message = ` EXPIRED ${Math.abs(daysDiff)} days ago!`;
       } else if (daysDiff <= 7) {
         className = 'expiry-urgent';
-        message = `🚨 Expires in ${daysDiff} days! (${expiryDate.toLocaleDateString()})`;
+        message = ` Expires in ${daysDiff} days! (${expiryDate.toLocaleDateString()})`;
       } else if (daysDiff <= 30) {
         className = 'expiry-critical';
-        message = `⚠️ Expires in ${daysDiff} days (${expiryDate.toLocaleDateString()})`;
+        message = ` Expires in ${daysDiff} days (${expiryDate.toLocaleDateString()})`;
       } else if (daysDiff <= 60) {
         className = 'expiry-warning';
-        message = `⚠️ Expires in ${daysDiff} days (${expiryDate.toLocaleDateString()})`;
+        message = ` Expires in ${daysDiff} days (${expiryDate.toLocaleDateString()})`;
       } else if (daysDiff <= 90) {
         className = 'expiry-good';
-        message = `✅ Expires in ${daysDiff} days (${expiryDate.toLocaleDateString()})`;
+        message = ` Expires in ${daysDiff} days (${expiryDate.toLocaleDateString()})`;
       } else {
         className = 'expiry-good';
-        message = `✅ Valid for ${daysDiff} days (${expiryDate.toLocaleDateString()})`;
+        message = ` Valid for ${daysDiff} days (${expiryDate.toLocaleDateString()})`;
       }
       
       return `<div class="expiry-info ${className}">${message}</div>`;
