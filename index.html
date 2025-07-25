@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SSL Certificate Checker</title>
+  <style>
+    body { 
+      font-family: Arial, sans-serif; 
+      margin: 40px; 
+      max-width: 800px; 
+      margin-left: auto; 
+      margin-right: auto; 
+    }
+    h1 { color: #333; }
+    textarea { 
+      width: 100%; 
+      height: 150px; 
+      margin-bottom: 16px; 
+      padding: 8px; 
+      border-radius: 4px; 
+      border: 1px solid #ddd; 
+    }
+    button { 
+      padding: 10px 24px; 
+      font-size: 16px; 
+      background-color: #4CAF50; 
+      color: white; 
+      border: none; 
+      border-radius: 4px; 
+      cursor: pointer; 
+    }
+    button:hover { background-color: #45a049; }
+    #result-link { 
+      display: none; 
+      margin-top: 24px; 
+      padding: 10px; 
+      background-color: #f5f5f5; 
+      border-radius: 4px; 
+    }
+    #results-section {
+      margin-top: 24px;
+      display: none;
+    }
+    .result-item {
+      margin-bottom: 20px;
+      border: 1px solid #ddd;
+      padding: 15px;
+      border-radius: 4px;
+      background-color: #f9f9f9;
+    }
+    .result-item h3 {
+      margin-top: 0;
+      color: #333;
+    }
+    .cert-info {
+      background: #f5f5f5;
+      padding: 10px;
+      border-radius: 4px;
+      font-family: monospace;
+      white-space: pre-wrap;
+      overflow-x: auto;
+    }
+    .status-success {
+      border-left: 5px solid #4CAF50;
+    }
+    .status-error {
+      border-left: 5px solid #f44336;
+    }
+    .error-message {
+      color: #f44336;
+      font-weight: bold;
+    }
+    .timestamp {
+      color: #666;
+      font-size: 0.9em;
+    }
+    .expiry-info {
+      margin-top: 10px;
+      padding: 8px;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+    .expiry-good {
+      background-color: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .expiry-warning {
+      background-color: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeaa7;
+    }
+    .expiry-critical {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .expiry-urgent {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+      font-weight: bold;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.7; }
+      100% { opacity: 1; }
+    }
+    .note { 
+      font-style: italic; 
+      color: #666; 
+      margin-top: 10px; 
+    }
+  </style>
+</head>
+<body>
+  <h1>SSL Certificate Checker</h1>
+  <p>Check the validity dates and information of SSL certificates for multiple websites.</p>
+  
+  <form id="sslForm">
+    <label for="urls">Enter one or more URLs (one per line):</label><br>
+    <textarea id="urls" name="urls" placeholder="example.com
+anotherdomain.com:443
+subdomain.example.org"></textarea>
+    <p class="note">Note: If port is omitted, port 443 (HTTPS) will be assumed.</p>
+    <button type="submit">Check Certificates</button>
+  </form>
+  
+  <div id="results-section">
+    <h2>Certificate Check Results</h2>
+    <div id="results-container"></div>
+  </div>
+  
+  <script>
+    document.getElementById('sslForm').onsubmit = async function(e) {
+      e.preventDefault();
+      const urls = document.getElementById('urls').value;
+      const button = document.querySelector('button');
+      const resultsSection = document.getElementById('results-section');
+      const resultsContainer = document.getElementById('results-container');
+      
+      button.disabled = true;
+      button.textContent = 'Checking...';
+      resultsSection.style.display = 'none';
+      
+      try {
+        const response = await fetch('/check', {
+          method: 'POST',
+          headers: {'Content-Type': 'text/plain'},
+          body: urls
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+        
+        const data = await response.json();
+        displayResults(data, resultsContainer);
+        resultsSection.style.display = 'block';
+        
+        // Scroll to results section after results are displayed
+        setTimeout(() => {
+          resultsSection.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start' 
+          });
+        }, 100); // Small delay to ensure the section is fully rendered
+        
+      } catch (error) {
+        alert('Error checking certificates: ' + error);
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Check Certificates';
+      }
+    };
+    
+    function displayResults(data, container) {
+      container.innerHTML = '';
+      
+      if (!data.results || data.results.length === 0) {
+        container.innerHTML = '<p>No results found.</p>';
+        return;
+      }
+      
+      data.results.forEach(result => {
+        const resultDiv = document.createElement('div');
+        resultDiv.className = `result-item status-${result.status}`;
+        
+        let html = `
+          <h3>Certificate for ${result.url}</h3>
+          <p class="timestamp">Check time: ${new Date(result.timestamp).toLocaleString()}</p>
+        `;
+        
+        if (result.status === 'error') {
+          html += `<p class="error-message">Error: ${result.error_message}</p>`;
+        } else if (result.cert_info) {
+          // Convert \\n back to actual newlines for display
+          const certDisplay = result.cert_info.replace(/\\n/g, '\n');
+          html += `<div class="cert-info">${certDisplay}</div>`;
+          
+          // Parse expiration date and add expiry warning
+          const expiryInfo = parseExpirationInfo(result.cert_info);
+          if (expiryInfo) {
+            html += expiryInfo;
+          }
+        }
+        
+        resultDiv.innerHTML = html;
+        container.appendChild(resultDiv);
+      });
+    }
+    
+    function parseExpirationInfo(certInfo) {
+      // Extract the notAfter date from cert_info
+      const notAfterMatch = certInfo.match(/notAfter=([^\s]+\s+\d+\s+\d+:\d+:\d+\s+\d+)/);
+      if (!notAfterMatch) {
+        return null;
+      }
+      
+      const notAfterStr = notAfterMatch[1].trim();
+      
+      try {
+        // Parse the date - handle different formats
+        // Format examples: "Apr 12 23:59:59 2015", "Sep 15 08:40:15 2025 GMT"
+        let dateStr = notAfterStr.replace(/\s+GMT\s*$/, '').trim();
+        
+        const expiryDate = new Date(dateStr);
+        
+        // Check if the date is valid
+        if (isNaN(expiryDate.getTime())) {
+          // Try alternative parsing if first attempt fails
+          const parts = dateStr.split(/\s+/);
+          if (parts.length >= 4) {
+            // Reconstruct as "Month Day, Year Time"
+            const monthDay = `${parts[0]} ${parts[1]}`;
+            const year = parts[3];
+            const time = parts[2];
+            const altDateStr = `${monthDay}, ${year} ${time}`;
+            const altDate = new Date(altDateStr);
+            
+            if (!isNaN(altDate.getTime())) {
+              const now = new Date();
+              const timeDiff = altDate.getTime() - now.getTime();
+              const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+              
+              if (isNaN(daysDiff)) {
+                return null;
+              }
+              
+              return generateExpiryMessage(daysDiff, altDate);
+            }
+          }
+          return null; // Hide invalid dates instead of showing error
+        }
+        
+        const now = new Date();
+        const timeDiff = expiryDate.getTime() - now.getTime();
+        const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+        
+        // Additional check for invalid calculations
+        if (isNaN(daysDiff)) {
+          return null;
+        }
+        
+        return generateExpiryMessage(daysDiff, expiryDate);
+        
+      } catch (error) {
+        console.error('Error parsing expiry date:', error);
+        return null; // Hide error messages instead of showing them
+      }
+    }
+    
+    function generateExpiryMessage(daysDiff, expiryDate) {
+      let className = '';
+      let message = '';
+      
+      if (daysDiff < 0) {
+        className = 'expiry-urgent';
+        message = `⚠️ EXPIRED ${Math.abs(daysDiff)} days ago!`;
+      } else if (daysDiff <= 7) {
+        className = 'expiry-urgent';
+        message = `🚨 Expires in ${daysDiff} days! (${expiryDate.toLocaleDateString()})`;
+      } else if (daysDiff <= 30) {
+        className = 'expiry-critical';
+        message = `⚠️ Expires in ${daysDiff} days (${expiryDate.toLocaleDateString()})`;
+      } else if (daysDiff <= 60) {
+        className = 'expiry-warning';
+        message = `⚠️ Expires in ${daysDiff} days (${expiryDate.toLocaleDateString()})`;
+      } else if (daysDiff <= 90) {
+        className = 'expiry-good';
+        message = `✅ Expires in ${daysDiff} days (${expiryDate.toLocaleDateString()})`;
+      } else {
+        className = 'expiry-good';
+        message = `✅ Valid for ${daysDiff} days (${expiryDate.toLocaleDateString()})`;
+      }
+      
+      return `<div class="expiry-info ${className}">${message}</div>`;
+    }
+  </script>
+</body>
+</html>
