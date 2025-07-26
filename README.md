@@ -33,7 +33,7 @@ This project is a web-based SSL certificate checker built using Alpine Linux, Ng
 ### Build and Run with Docker
 ```bash
 docker build -t ssl-checker .
-docker run -p 80:80 ssl-checker
+docker run -d -p 8080:80 ssl-checker
 ```
 Then open [http://localhost:8080](http://localhost:8080) in your browser.
 
